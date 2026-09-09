@@ -1,9 +1,8 @@
 #include <kaulab.h>
 
+
 int lineread;
 void FollowLine(){
-  
-  while(true){
   lineread = zRobotGetLineSensor();
 
   if (lineread == 2){
@@ -20,16 +19,15 @@ void FollowLine(){
     zRobotSetMotorSpeed(2, 0);    
   }
   }
-} 
-void Obstacle(){
-  distance = zRobotGetUltraSensor();
-  if(distance > 0 && distance < 20){
-    zRobotSetMotorSpeed(1, );
-    zRobotSetMotorSpeed(2, )
-  } else {
-    FollowLine();
-  }
-}
+//void Obstacle(){
+//  distance = zRobotGetUltraSensor();
+//  if(distance > 0 && distance < 20){
+//    zRobotSetMotorSpeed(1, );
+//    zRobotSetMotorSpeed(2, )
+//  } else {
+//    FollowLine();
+//  }
+//}
 // 3 = no line
 // 0 = both on line
 // 2 = right on line
@@ -44,8 +42,8 @@ void setup() {
   zRobotSetMotorSpeed(1, -70);
   zRobotSetMotorSpeed(2, 0);
 
-  zScheduleTask(Obstacle(), 50, 1000);
-  zScheduleTask(FollowLine(), 70, 1000);
+  // zScheduleTask(Obstacle(), , );
+   zScheduleTask(FollowLine, 100, 70);
   
 }
 
