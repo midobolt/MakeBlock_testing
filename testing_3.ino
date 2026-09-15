@@ -20,7 +20,6 @@ int statusR = 0;
 int statusG = 0;
 int statusB = 0;
 
-int obs = 0;
 
 // ==================================================
 // LED BLINKER
@@ -107,57 +106,6 @@ void goStraight(){
     zRobotSetMotorSpeed(2, leftMotor);
 }
 
-// ==================================================
-// OBSTACLE MANEUVER
-// ==================================================
-void obstacleTurnRight() {
-
-  turningRight = true;
-  turningLeft = false;
-
-  statusR = 255;
-  statusG = 0;
-  statusB = 0;
-
-  // Rotate right
-  zRobotSetMotorSpeed(1, -(rightMotor));
-  zRobotSetMotorSpeed(2, leftMotor);
-
-  zBlockingDelay(100);
-}
-void obstacleForward() {
-
-  turningRight = false;
-  turningLeft = false;
-
-  statusR = 255;
-  statusG = 0;
-  statusB = 0;
-
-  // Drive around obstacle
-  zRobotSetMotorSpeed(1, rightMotor);
-  zRobotSetMotorSpeed(2, leftMotor);
-
-  zBlockingDelay(150);
-}
-
-
-void obstacleTurnLeft() {
-
-  turningRight = false;
-  turningLeft = true;
-
-  statusR = 255;
-  statusG = 0;
-  statusB = 0;
-
-  // Rotate left
-  zRobotSetMotorSpeed(1, rightMotor);
-  zRobotSetMotorSpeed(2, -leftMotor);
-
-  zBlockingDelay(100);
-}
-
 
 // ==================================================
 // FOLLOW LINE
@@ -192,13 +140,17 @@ void followLine(){
 void avoidObstacle() {
   Serial.println("OBSTACLE!");
 
-  obstacleTurnRight();
+  goRight();
+  zBlockingDelay(100);
 
-  obstacleForward();
+  goStraight();
+  zBlockingDelay(150);
 
-  obstacleTurnLeft();
+  goLeft();
+  zBlockingDelay(100);
 
-  obstacleForward();
+  goStraight();
+  zBlockingDelay(150);
 
   findLine();
 
