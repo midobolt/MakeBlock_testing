@@ -1,10 +1,5 @@
 #include <kaulab.h>
-// void obstacle_Calc(){
-//   int s = 0;
-//   int t = 0;
-//   int v = 0;
-//   if ()
-// }
+
 // 3 = no line
 // 0 = both on line
 // 2 = right on line
@@ -27,6 +22,9 @@ int statusB = 0;
 
 int obs = 0;
 
+// ==================================================
+// LED BLINKER
+// ==================================================
 void updateBlinker() {  
         blinkCounter++;
      if (blinkCounter >= 10) {
@@ -66,6 +64,10 @@ void updateBlinker() {
         zLedRing.show();
 }
 
+// ==================================================
+// LINE FOLLOWING MOVEMENTS
+// ==================================================
+
 void goRight(){
     turningRight = true;
     turningLeft = false;
@@ -84,7 +86,7 @@ void goLeft(){
     zRobotSetMotorSpeed(1, rightMotor);
     zRobotSetMotorSpeed(2, -leftMotor);
 }
-void findLineLeft(){
+void findLine(){
         turningRight = false;
         turningLeft = false;
       statusR = 255;
@@ -93,15 +95,7 @@ void findLineLeft(){
   zRobotSetMotorSpeed(1, rightMotor + 30);
     zRobotSetMotorSpeed(2, -leftMotor + 60);   
 }
-void findLineRight(){
-        turningRight = false;
-        turningLeft = false;
-      statusR = 255;
-      statusG = 255;
-      statusB = 0;
-    zRobotSetMotorSpeed(1, rightMotor + 50);
-    zRobotSetMotorSpeed(2, -leftMotor + 30);   
-}  
+
 void goStraight(){
         turningRight = false;
         turningLeft = false;
@@ -113,40 +107,113 @@ void goStraight(){
     zRobotSetMotorSpeed(2, leftMotor);
 }
 
+// ==================================================
+// OBSTACLE MANEUVER
+// ==================================================
+void obstacleTurnRight() {
+
+  turningRight = true;
+  turningLeft = false;
+
+  statusR = 255;
+  statusG = 0;
+  statusB = 0;
+
+  // Rotate right
+  zRobotSetMotorSpeed(1, -(rightMotor));
+  zRobotSetMotorSpeed(2, leftMotor);
+
+  zBlockingDelay(100);
+}
+void obstacleForward() {
+
+  turningRight = false;
+  turningLeft = false;
+
+  statusR = 255;
+  statusG = 0;
+  statusB = 0;
+
+  // Drive around obstacle
+  zRobotSetMotorSpeed(1, rightMotor);
+  zRobotSetMotorSpeed(2, leftMotor);
+
+  zBlockingDelay(150);
+}
+
+
+void obstacleTurnLeft() {
+
+  turningRight = false;
+  turningLeft = true;
+
+  statusR = 255;
+  statusG = 0;
+  statusB = 0;
+
+  // Rotate left
+  zRobotSetMotorSpeed(1, rightMotor);
+  zRobotSetMotorSpeed(2, -leftMotor);
+
+  zBlockingDelay(100);
+}
+
+
+// ==================================================
+// FOLLOW LINE
+// ==================================================
+
 void followLine(){
   int lineread = zRobotGetLineSensor();
     
   if (lineread == 1){
-    obs = 0;
     goLeft();
     Serial.println("Sensor 2 is on line going RIGHT");
+
   } else if(lineread == 2){
-    obs = 0;
     goRight();
     Serial.println("Sensor 1 is on line going LEFT");
+
   } else if(lineread == 0){
-    obs = 0;
     goStraight();
     Serial.println("Sensor 2 + 1 is on line going STRAIGHT");
+
   } else if (lineread == 3){
-    if(obs){
-      findLineRight();
-    } else{
-     findLineRight();
-    }
+     findLine();
+
     Serial.println("Finding line");
   }
 }
+
+// ==================================================
+// OBSTACLE AVOIDANCE
+// ==================================================
+
+void avoidObstacle() {
+  Serial.println("OBSTACLE!");
+
+  obstacleTurnRight();
+
+  obstacleForward();
+
+  obstacleTurnLeft();
+
+  obstacleForward();
+
+  findLine();
+
+  Serial.println("LINE FOUND");
+}
+
+
 void obstacle(){
  int distance = zRobotGetUltraSensor();
 
  if(distance > 0 && distance < 25){
-      obs = 1;
       statusR = 255;
       statusG = 0;
       statusB = 0;
-   zRobotSetMotorSpeed(1, rightMotor + 5);
-   zRobotSetMotorSpeed(2, -leftMotor + 20);
+   avoidObstacle();
  } else {
     // No object detected
     followLine();
