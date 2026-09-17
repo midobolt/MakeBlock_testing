@@ -91,8 +91,8 @@ void findLine(){
       statusR = 255;
       statusG = 255;
       statusB = 0;
-  zRobotSetMotorSpeed(1, rightMotor + 30);
-    zRobotSetMotorSpeed(2, -leftMotor + 60);   
+  zRobotSetMotorSpeed(1, rightMotor + 10);
+    zRobotSetMotorSpeed(2, -leftMotor + 20);   
 }
 
 void goStraight(){
@@ -137,39 +137,77 @@ void followLine(){
 // OBSTACLE AVOIDANCE
 // ==================================================
 
+int avoidStep = 0;
+int avoidCounter = 0;
+bool avoiding = false;
+
 void avoidObstacle() {
-  Serial.println("OBSTACLE!");
 
-  goRight();
-  zBlockingDelay(100);
+  avoidCounter++;
 
-  goStraight();
-  zBlockingDelay(150);
+  if (avoidCounter < 20) {
+    return;
+  }
 
-  goLeft();
-  zBlockingDelay(100);
+  avoidCounter = 0;
 
-  goStraight();
-  zBlockingDelay(150);
+  switch (avoidStep) {
 
-  findLine();
+    case 0:
+      goRight();
+      avoidStep++;
+      break;
 
-  Serial.println("LINE FOUND");
+    case 1:
+      goStraight();
+      avoidStep++;
+      break;
+
+    case 2:
+      goLeft();
+      avoidStep++;
+      break;
+
+    case 3:
+      goStraight();
+      avoidStep++;
+      break;
+
+    case 4:
+      goLeft();
+      avoidStep++;
+      break;
+
+    case 5:
+      goStraight();
+      avoidStep++;
+      break;
+
+      if (zRobotGetLineSensor() != 3) {
+        avoiding = false;
+        avoidStep = 0;
+      }
+      break;
+  }
 }
 
+void obstacle() {
 
-void obstacle(){
- int distance = zRobotGetUltraSensor();
+  int distance = zRobotGetUltraSensor();
 
- if(distance > 0 && distance < 25){
-      statusR = 255;
-      statusG = 0;
-      statusB = 0;
-   avoidObstacle();
- } else {
-    // No object detected
+  if (!avoiding && distance > 0 && distance < 10) {
+    Serial.println("OBSTACLE!");
+
+    avoiding = true;
+    avoidStep = 0;
+    avoidCounter = 0;
+  }
+
+  if (avoiding) {
+    avoidObstacle();
+  } else {
     followLine();
-}
+  }
 }
 
 void setup() {
@@ -177,7 +215,7 @@ void setup() {
   zInitialize();
   Serial.begin(9600);
   zScheduleTask(obstacle, 3, 1);
-//  zScheduleTask(updateBlinker, 3, 3);
+  zScheduleTask(updateBlinker, 3, 3);
 
   zStart();
 }
