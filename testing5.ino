@@ -18,36 +18,95 @@ int leftMotor = 100;
 boolean turningRight = false;
 boolean turningLeft = false;
 
+int avoidState = 0;          // 0=Normal, 1=Backing Up, 2=Turning Right, 3=Finding Line
+unsigned long avoidStartTime = 0; // Tracks time for non-blocking delays
+
+
 // ==================================================
 // 1. UNIFIED SENSOR & CONTROL LOOP
 // ==================================================
+//void updateRobotState() {
+//  int distance = zRobotGetUltraSensor();
+//  int sensor = zRobotGetLineSensor();
+//
+//  if (distance >= 0 && distance < 10) {
+//    handleObstacle(distance, sensor);
+//  }
+//  else {
+//    handleLineFollowing(sensor);
+//  }
+//}
+
 void updateRobotState() {
   int distance = zRobotGetUltraSensor();
   int sensor = zRobotGetLineSensor();
 
-  if (distance >= 0 && distance < 10) {
+  
+  if (avoidState > 0) {
     handleObstacle(distance, sensor);
-  }
+  } 
   else {
-    handleLineFollowing(sensor);
+    if (distance >= 0 && distance < 10) {
+      handleObstacle(distance, sensor); 
+    } else {
+      handleLineFollowing(sensor);
+    }
   }
 }
+
 
 // ==================================================
 // 2. BEHAVIOR DECISIONS
 // ==================================================
+//void handleObstacle(int distance, int sensor) {
+//  Serial.println("Obstacle detected! Avoiding.");
+//
+//  if (distance >= 0 && distance < 10) {
+//    goBack();
+//  } else if (distance < 13) {
+//    goRight();
+//  } else if (sensor == 3) {
+//    findLine();
+//  }
+//}
 void handleObstacle(int distance, int sensor) {
-  Serial.println("Obstacle detected! Avoiding.");
+  // Trigger the sequence if we are in normal state and hit an obstacle
+  if (avoidState == 0) {
+    Serial.println("Obstacle detected! Starting avoidance sequence.");
+    avoidState = 1;
+    avoidStartTime = millis(); // Start the timer
+  }
 
-  if (distance >= 0 && distance < 10) {
+  // STEP 1: Back up for ~600ms (Adjust this number if 3cm takes more/less time)
+  if (avoidState == 1) {
     goBack();
-  } else if (distance < 13) {
+    if (millis() - avoidStartTime >= 600) { 
+      avoidState = 2;
+      avoidStartTime = millis(); // Reset timer for the next step
+      Serial.println("Backed up. Now turning right to go around.");
+    }
+  } 
+  
+  // STEP 2: Turn right until the ultrasonic sensor sees open space (> 15 cm)
+  else if (avoidState == 2) {
     goRight();
-  } else if (sensor == 3) {
+    int currentDist = zRobotGetUltraSensor(); // Read fresh distance
+    // 15cm is a safe buffer. -1 is often returned by sensors when no obstacle is detected
+    if (currentDist > 15 || currentDist == -1) { 
+      avoidState = 3;
+      Serial.println("Path clear. Searching for line.");
+    }
+  } 
+  
+ 
+  else if (avoidState == 3) {
     findLine();
+    if (sensor == 0 || sensor == 3) {
+      avoidState = 0; 
+      Serial.println("Line found! Resuming normal operation.");
+    }
   }
 }
-
 void handleLineFollowing(int sensor) {
   if (sensor == 1) {
     goLeft();
