@@ -17,6 +17,9 @@ int distance = 0;
 int rightMotor = -120;
 int leftMotor = 120;
 
+#define LINE_LOST_TIME 200  // milliseconds
+TickType_t lineLostStart = 0;
+
 #define TURN_TIME 25  // 25 × 16 = 400 ms
 #define FORWARD_TIME 38  // 38 × 16 ≈ 608 ms
 #define OBSTACLE_DISTANCE 15
@@ -99,37 +102,59 @@ void findLine() {
 
 void lineFollow() {
 
+  TickType_t now = xTaskGetTickCount();
+
   switch (lineSensor) {
 
     case 0:
+      // Both sensors see line
+      lineLostStart = 0;
       goStraight();
       break;
 
 
     case 1:
+      // Left sensor sees line
+      lineLostStart = 0;
       lastDirection = COUNTERCLOCKWISE;
 
       goLeft();
-//      zRobotSetMotorSpeed(1, -70);
-//      zRobotSetMotorSpeed(2, 40);
-Serial.println("Going Left");
 
       break;
 
 
     case 2:
+      // Right sensor sees line
+      lineLostStart = 0;
       lastDirection = CLOCKWISE;
-      goRight();
-//      zRobotSetMotorSpeed(1, -40);
-//      zRobotSetMotorSpeed(2, 70);
-Serial.println("Going Right");
 
+      goRight();
 
       break;
 
 
     case 3:
-      findLine();
+      // No sensor sees line
+
+      if (lineLostStart == 0) {
+        lineLostStart = now;
+      }
+
+      if (now - lineLostStart >= LINE_LOST_TIME) {
+        // Line has been missing long enough → search for it
+        findLine();
+      } 
+      else {
+        // Only briefly lost → continue turning the
+        // same direction as the previous correction
+
+        if (lastDirection == CLOCKWISE) {
+          goRight();
+        } else {
+          goLeft();
+        }
+      }
+
       break;
   }
 }
