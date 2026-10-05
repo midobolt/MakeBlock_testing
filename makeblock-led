@@ -1,0 +1,413 @@
+#include <kaulab.h>
+
+
+// 3 = no line
+// 0 = both sensors on line
+// 2 = right sensor on line
+// 1 = left sensor on line
+
+// 1 = right motor
+// 2 = left motor
+
+int lineSensor = 3;
+int distance = 0;
+
+bool turningRight = false;
+bool turningLeft = false;
+bool blinkState = false;
+int blinkCounter = 0;
+
+int statusR = 0;
+int statusG = 0;
+int statusB = 0;
+
+
+
+int rightMotor = -85;
+int leftMotor = 85;
+
+void updateBlinker() {
+        blinkCounter++;
+     if (blinkCounter >= 10) {
+            blinkCounter = 0;
+            blinkState = !blinkState;
+        }
+    // RIGHT TURN
+    if (turningRight) {
+
+            // Blinker ON
+            for (int i = 0; i < 12; i++) {
+
+                if ( blinkState && (i == 4 || i == 5 || i == 6)) {
+                    zLedRing.setColorAt(i, 0, 255, 0);
+                } 
+                else {
+                    zLedRing.setColorAt(i, 0, 0, 0);
+                }
+            }
+
+        } 
+        else if (turningLeft){
+          for (int i = 0; i < 12; i++) {
+
+            if (blinkState &&
+                (i == 10 || i == 11 || i == 0)) {
+
+                zLedRing.setColorAt(i, 0, 255, 0);
+            }
+            else {
+                zLedRing.setColorAt(i, 0, 0, 0);
+            }
+          }
+        } else  {
+
+            // Blinker OFF
+            for (int i = 0; i < 12; i++) {
+                zLedRing.setColorAt(i, statusR, statusG, statusB);
+            }
+        }
+
+        zLedRing.show();
+    
+}
+#define LINE_LOST_TIME 150  // milliseconds
+TickType_t lineLostStart = 0;
+
+#define TURN_TIME 40  
+#define FORWARD_TIME 35 
+#define OBSTACLE_DISTANCE 20
+
+
+enum Direction {
+  CLOCKWISE,
+  COUNTERCLOCKWISE
+};
+
+Direction lastDirection = CLOCKWISE;
+
+
+enum RobotState {
+  FOLLOW_LINE,
+
+  AVOID_TURN_1,
+  AVOID_FORWARD_1,
+
+  AVOID_TURN_2,
+  AVOID_FORWARD_2,
+
+  AVOID_TURN_3,
+  AVOID_FORWARD_3,
+
+  SEARCH_LINE
+};
+RobotState robotState = FOLLOW_LINE;
+TickType_t stateStartTime = 0;
+
+
+
+void goRight() {
+turningRight = true;
+    turningLeft = false;
+      statusR = 0;
+      statusG = 255;
+      statusB = 0;
+  zRobotSetMotorSpeed(1,  -(rightMotor) - 70);
+  zRobotSetMotorSpeed(2, leftMotor + 30);
+  Serial.println("Going right");
+}
+
+
+void goLeft() {
+  turningRight = false;
+      turningLeft = true;
+      statusR = 0;
+      statusG = 255;
+      statusB = 0;
+  zRobotSetMotorSpeed(1, rightMotor - 30);
+  zRobotSetMotorSpeed(2, -leftMotor + 70);
+  Serial.println("Going left");
+}
+
+
+void goStraight() {
+   turningRight = false;
+        turningLeft = false;
+      // zSetAllLed(255, 255, 255);
+      statusR = 0;
+      statusG = 0;
+      statusB = 0;
+
+  zRobotSetMotorSpeed(1, rightMotor);
+  zRobotSetMotorSpeed(2, leftMotor);
+  Serial.println("Going right");
+}
+
+
+void findLine() {
+ TickType_t now = xTaskGetTickCount();
+  turningRight = false;
+        turningLeft = false;
+      statusR = 255;
+      statusG = 255;
+      statusB = 0;
+ 
+      if (lastDirection == CLOCKWISE) {
+
+        // Clockwise → turn right
+        goRight();
+
+      } else {
+
+        // Counterclockwise → turn left
+        goLeft();
+      }
+
+//      if (now - stateStartTime >= TURN_TIME) {
+//
+//        robotState = AVOID_FORWARD_1;
+//
+//        stateStartTime = now;
+//      }
+
+
+//  zRobotSetMotorSpeed(1, rightMotor + 30);
+//  zRobotSetMotorSpeed(2,  -leftMotor + 40);
+}
+
+
+void lineFollow() {
+
+  TickType_t now = xTaskGetTickCount();
+
+  switch (lineSensor) {
+
+    case 0:
+      // Both sensors see line
+      lineLostStart = 0;
+      goStraight();
+      
+      break;
+
+
+    case 1:
+      // Left sensor sees line
+      lineLostStart = 0;
+      lastDirection = COUNTERCLOCKWISE;
+
+      goLeft();
+      
+      break;
+
+
+    case 2:
+      // Right sensor sees line
+      lineLostStart = 0;
+      lastDirection = CLOCKWISE;
+
+      goRight();
+    
+      break;
+
+
+    case 3:
+      // No sensor sees line
+      if ( lastDirection == CLOCKWISE){
+        
+      }
+      if (lineLostStart == 0) {
+        lineLostStart = now;
+      }
+
+      if (now - lineLostStart >= LINE_LOST_TIME) {
+        // Line has been missing long enough → search for it
+        findLine();
+      } 
+      else {
+        // Only briefly lost → continue turning the
+        // same direction as the previous correction
+
+        if (lastDirection == CLOCKWISE) {
+          goRight();
+        } else {
+          goLeft();
+        }
+      }
+
+      break;
+  }
+}
+
+
+void sensorTask() {
+
+  lineSensor = zRobotGetLineSensor();
+
+  distance = zRobotGetUltraSensor();
+}
+
+void controlTask() {
+
+  TickType_t now = xTaskGetTickCount();
+
+
+  switch (robotState) {
+
+    case FOLLOW_LINE:
+
+      if (distance > 0 && distance < OBSTACLE_DISTANCE) {
+
+        Serial.println("OBSTACLE");
+
+        robotState = AVOID_TURN_1;
+
+        stateStartTime = now;
+
+      } else {
+
+        lineFollow();
+      }
+
+      break;
+
+
+    case AVOID_TURN_1:
+
+      if (lastDirection == CLOCKWISE) {
+        Serial.println("AVOID TURN 1");
+
+        // Clockwise → turn right
+        goRight();
+
+      } else {
+
+        // Counterclockwise → turn left
+        goLeft();
+         Serial.println("AVOID TURN 1");
+      }
+
+
+      if (now - stateStartTime >= TURN_TIME) {
+
+        robotState = AVOID_FORWARD_1;
+
+        stateStartTime = now;
+      }
+      
+      break;
+
+    case AVOID_FORWARD_1:
+
+      goStraight();
+
+
+      if (now - stateStartTime >= FORWARD_TIME) {
+
+        robotState = AVOID_TURN_2;
+
+        stateStartTime = now;
+      }
+
+      break;
+      
+//#define TURN_TIME 30  // 25 × 16 = 400 ms
+//#define FORWARD_TIME 38  // 38 × 16 ≈ 608 ms
+
+    case AVOID_TURN_2:
+
+      if (lastDirection == CLOCKWISE) {
+
+        // Opposite of first turn
+        goLeft();
+
+      } else {
+
+        goRight();
+      }
+
+
+      if (now - stateStartTime >= TURN_TIME) {
+
+        robotState = AVOID_FORWARD_2;
+
+        stateStartTime = now;
+      }
+
+      break;
+
+    case AVOID_FORWARD_2:
+
+      goStraight();
+
+      if (now - stateStartTime >= TURN_TIME) {
+
+        robotState = AVOID_TURN_3;
+
+        stateStartTime = now;
+      }
+
+      break;
+
+    case AVOID_TURN_3:
+
+      if (lastDirection == CLOCKWISE) {
+
+        goLeft();
+
+      } else {
+
+        goRight();
+      }
+
+
+      if (now - stateStartTime >= TURN_TIME) {
+
+        robotState = AVOID_FORWARD_3;
+
+        stateStartTime = now;
+      }
+
+      break;
+      
+      case AVOID_FORWARD_3:
+
+      goStraight();
+
+      if (now - stateStartTime >= TURN_TIME - 20) {
+
+        robotState = SEARCH_LINE;
+
+        stateStartTime = now;
+      }
+
+      break;
+
+    case SEARCH_LINE:
+
+      lineFollow();
+
+      robotState = FOLLOW_LINE;
+
+      break;
+  }
+}
+
+
+void setup() {
+
+  zInitialize();
+
+  Serial.begin(9600);
+
+  zScheduleTask(sensorTask, 3, 1);
+
+  zScheduleTask(controlTask, 3, 1);
+
+  zScheduleTask(updateBlinker, 3, 1);
+
+  zStart();
+}
+
+
+void loop() {
+
+}
